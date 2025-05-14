@@ -1,7 +1,5 @@
 set -e
 
-extra_args="--weight_block_size channel"
-
 run() {
 	model=$1
 	quant_config=$2
@@ -23,7 +21,7 @@ run() {
 		--ddp_find_unused_parameters False \
 		--save_strategy "no" \
 		--learning_rate 2e-5 \
-		--weight_decay 0. \
+		--weight_decay 0.01 \
 		--warmup_ratio 0. \
 		--lr_scheduler_type "cosine" \
 		--logging_steps 1 \
@@ -32,32 +30,24 @@ run() {
 		--qat True \
 		--train_ds_path ./train.jsonl \
 		--valid_ds_path ./valid.jsonl \
-		$quant_config \
-		$extra_args
+		$quant_config
 }
 
 models=("facebook/MobileLLM-125M" "facebook/MobileLLM-600M" "meta-llama/Llama-3.2-1B")
 
 quant_configs=(
-	"--activation_qtype float --activation_qbits 4 --activation_format e2m1 --activation_alg minmax --weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg minmax"
-	"--activation_qtype float --activation_qbits 4 --activation_format e2m1 --activation_alg iterative --weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg normal"
-	"--activation_qtype float --activation_qbits 4 --activation_format e2m1 --activation_alg minmax --weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg normal"
-	"--activation_qtype float --activation_qbits 4 --activation_format e2m1 --activation_alg minmax --weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg lsq"
-	"--activation_qtype float --activation_qbits 4 --activation_format e2m1 --activation_alg lsq --weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg lsq"
-	"--activation_qtype float --activation_qbits 4 --activation_format e3m0 --activation_alg minmax --weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg minmax"
-	"--activation_qtype float --activation_qbits 4 --activation_format e3m0 --activation_alg iterative --weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg normal"
-	"--activation_qtype float --activation_qbits 4 --activation_format e3m0 --activation_alg minmax --weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg normal"
-	"--activation_qtype float --activation_qbits 4 --activation_format e3m0 --activation_alg minmax --weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg lsq"
-	"--activation_qtype float --activation_qbits 4 --activation_format e3m0 --activation_alg lsq --weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg lsq"
+	"--weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg minmax --weight_block_size channel"
+	"--weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg iterative --weight_block_size channel"
+	"--weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg normal --weight_block_size channel"
+	"--weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg lsq --weight_block_size channel"
+	"--weight_qtype uniform --weight_qbits 4 --weight_alg minmax --weight_block_size channel"
+	"--weight_qtype uniform --weight_qbits 4 --weight_alg iterative --weight_block_size channel"
+	"--weight_qtype uniform --weight_qbits 4 --weight_alg normal --weight_block_size channel"
+	"--weight_qtype uniform --weight_qbits 4 --weight_alg lsq --weight_block_size channel"
 	"--weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg minmax"
 	"--weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg iterative"
 	"--weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg normal"
 	"--weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg lsq"
-	"--activation_qtype uniform --activation_qbits 4 --activation_alg minmax --weight_qtype uniform --weight_qbits 4 --weight_alg minmax"
-	"--activation_qtype uniform --activation_qbits 4 --activation_alg iterative --weight_qtype uniform --weight_qbits 4 --weight_alg normal"
-	"--activation_qtype uniform --activation_qbits 4 --activation_alg minmax --weight_qtype uniform --weight_qbits 4 --weight_alg normal"
-	"--activation_qtype uniform --activation_qbits 4 --activation_alg minmax --weight_qtype uniform --weight_qbits 4 --weight_alg lsq"
-	"--activation_qtype uniform --activation_qbits 4 --activation_alg lsq --weight_qtype uniform --weight_qbits 4 --weight_alg lsq"
 	"--weight_qtype uniform --weight_qbits 4 --weight_alg minmax"
 	"--weight_qtype uniform --weight_qbits 4 --weight_alg iterative"
 	"--weight_qtype uniform --weight_qbits 4 --weight_alg normal"
