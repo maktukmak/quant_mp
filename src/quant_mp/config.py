@@ -19,7 +19,7 @@ class QuantConfig:
 
     @property
     def alg_requires_grad_params(self) -> bool:
-        return self.alg == "lsq"
+        return False
 
 
 @dataclass

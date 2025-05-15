@@ -66,19 +66,15 @@ quant_configs=(
 	"--weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg minmax --weight_block_size channel"
 	"--weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg iterative --weight_block_size channel"
 	"--weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg normal --weight_block_size channel"
-	"--weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg lsq --weight_block_size channel"
 	"--weight_qtype uniform --weight_qbits 4 --weight_alg minmax --weight_block_size channel"
 	"--weight_qtype uniform --weight_qbits 4 --weight_alg iterative --weight_block_size channel"
 	"--weight_qtype uniform --weight_qbits 4 --weight_alg normal --weight_block_size channel"
-	"--weight_qtype uniform --weight_qbits 4 --weight_alg lsq --weight_block_size channel"
 	"--weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg minmax"
 	"--weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg iterative"
 	"--weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg normal"
-	"--weight_qtype float --weight_qbits 4 --weight_format e2m1 --weight_alg lsq"
 	"--weight_qtype uniform --weight_qbits 4 --weight_alg minmax"
 	"--weight_qtype uniform --weight_qbits 4 --weight_alg iterative"
 	"--weight_qtype uniform --weight_qbits 4 --weight_alg normal"
-	"--weight_qtype uniform --weight_qbits 4 --weight_alg lsq"
 )
 
 job_id=0

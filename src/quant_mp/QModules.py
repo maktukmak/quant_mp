@@ -11,7 +11,6 @@ from quant_mp.quantizer import (
 )
 from torch.nn.functional import conv2d
 from math import prod
-from quant_mp.lsq import LsqBinaryTernaryExtension
 
 
 # FIXME: Not updated to new API yet
@@ -64,9 +63,7 @@ class QuantFunction(Function):
 
 
 def get_quantize_function_cls(qconfig: QuantConfig) -> Type[Function]:
-    if qconfig.alg == "lsq":
-        return LsqBinaryTernaryExtension
-    elif qconfig.alg in ["minmax", "lsq", "iterative", "normal"]:
+    if qconfig.alg in ["minmax", "iterative", "normal"]:
         return QuantFunction
     raise ValueError(f"No quantization function found for {qconfig}")
 

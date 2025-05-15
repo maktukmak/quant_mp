@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
-from exps.run_exp_llm import QuantizationArguments
 
+from exps.run_exp_llm import QuantizationArguments
 
 MODELS = [
     "facebook/MobileLLM-125M",
@@ -22,12 +22,6 @@ QUANT_ARGS = [
         weight_qtype="float",
         weight_qbits=4,
         weight_format="e2m1",
-        weight_alg="lsq",
-    ),
-    QuantizationArguments(
-        weight_qtype="float",
-        weight_qbits=4,
-        weight_format="e2m1",
         weight_alg="iterative",
     ),
     QuantizationArguments(
@@ -41,13 +35,6 @@ QUANT_ARGS = [
         weight_qbits=4,
         weight_format="e2m1",
         weight_alg="minmax",
-        weight_block_size="channel",
-    ),
-    QuantizationArguments(
-        weight_qtype="float",
-        weight_qbits=4,
-        weight_format="e2m1",
-        weight_alg="lsq",
         weight_block_size="channel",
     ),
     QuantizationArguments(
@@ -72,11 +59,6 @@ QUANT_ARGS = [
     QuantizationArguments(
         weight_qtype="uniform",
         weight_qbits=4,
-        weight_alg="lsq",
-    ),
-    QuantizationArguments(
-        weight_qtype="uniform",
-        weight_qbits=4,
         weight_alg="iterative",
     ),
     QuantizationArguments(
@@ -88,12 +70,6 @@ QUANT_ARGS = [
         weight_qtype="uniform",
         weight_qbits=4,
         weight_alg="minmax",
-        weight_block_size="channel",
-    ),
-    QuantizationArguments(
-        weight_qtype="uniform",
-        weight_qbits=4,
-        weight_alg="lsq",
         weight_block_size="channel",
     ),
     QuantizationArguments(

@@ -51,7 +51,7 @@ class QuantizationArguments:
     activation_alg: Optional[str] = field(
         default=None,
         metadata={
-            "choices": ["minmax", "normal", "iterative", "lsq"],
+            "choices": ["minmax", "normal", "iterative"],
             "help": "Quantization algorithm for activations.",
         },
     )
@@ -78,7 +78,7 @@ class QuantizationArguments:
     weight_alg: Optional[str] = field(
         default=None,
         metadata={
-            "choices": ["minmax", "normal", "iterative", "lsq"],
+            "choices": ["minmax", "normal", "iterative"],
             "help": "Quantization algorithm for activations.",
         },
     )
@@ -330,10 +330,6 @@ def main(
     train_ds = CustomJsonDataset(
         train_data, tokenizer, block_size=training_args.model_max_length
     )
-    if training_args.do_train and quant_args.activation_alg == "lsq":
-        # LSQ initialization
-        with torch.no_grad():
-            model(torch.tensor(train_ds[0]["input_ids"]).unsqueeze(0))
 
     valid_ds = None
     if data_args.valid_ds_path is not None:
