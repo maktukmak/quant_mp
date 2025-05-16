@@ -290,7 +290,7 @@ def print_once(*args, **kwargs):
         print(*args, **kwargs)
 
 
-def load_quant_model(quant_model_path: str | Path, rconfig: QuantLinearConfig):
+def load_quant_model(quant_model_path: str | Path, rconfig: rconfig):
     config = AutoConfig.from_pretrained(quant_model_path, trust_remote_code=True)
     if hasattr(config, "auto_map"):
         model_cls = get_class_from_dynamic_module(
