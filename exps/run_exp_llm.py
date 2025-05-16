@@ -2,17 +2,22 @@ import json
 import math
 from dataclasses import dataclass, field
 import os
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from safetensors.torch import load_file
 import torch
 import torch.distributed as dist
 import transformers
 from transformers import (
+    AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
     Trainer,
     default_data_collator,
 )
+from transformers.dynamic_module_utils import get_class_from_dynamic_module
+from transformers.models.auto.auto_factory import _get_model_class
 
 from quant_mp.config import qconfig, rconfig
 from quant_mp.utils import patch_model
@@ -285,6 +290,25 @@ def print_once(*args, **kwargs):
         print(*args, **kwargs)
 
 
+def load_quant_model(quant_model_path: str | Path, rconfig: QuantLinearConfig):
+    config = AutoConfig.from_pretrained(quant_model_path, trust_remote_code=True)
+    if hasattr(config, "auto_map"):
+        model_cls = get_class_from_dynamic_module(
+            config.auto_map["AutoModelForCausalLM"], quant_model_path
+        )
+    elif type(config) in AutoModelForCausalLM._model_mapping.keys():
+        model_cls = _get_model_class(config, AutoModelForCausalLM._model_mapping)
+    else:
+        raise RuntimeError(f"Could not find model class for {quant_model_path}")
+    model = model_cls(config)
+    patch_model(model, rconfig)
+    state_dict = {}
+    for state_dict_path in Path(quant_model_path).glob("*.safetensors"):
+        state_dict.update(load_file(state_dict_path))
+    model.load_state_dict(state_dict, strict=False)
+    return model
+
+
 def main(
     model_args: ModelArguments,
     training_args: TrainingArguments,
@@ -335,17 +359,17 @@ def main(
             train_result = trainer.train()
             trainer.save_state()
             trainer.save_model(output_path)
-            if training_args.do_eval:
-                print_once(
-                    "Model may not be evaluated correctly on this run since training and eval on same run."
-                )
         else:
             print_once(f"Model found at {output_path}")
-            trainer.model = AutoModelForCausalLM.from_pretrained(
-                output_path, trust_remote_code=True
-            )
             if quant_args.is_quant:
-                patch_model(model, quant_config)  # type: ignore
+                trainer.model = load_quant_model(
+                    output_path,
+                    quant_config,  # type: ignore
+                )
+            else:
+                trainer.model = AutoModelForCausalLM.from_pretrained(
+                    output_path, trust_remote_code=True
+                )
 
     if training_args.do_eval and valid_ds is not None:
         metrics = trainer.evaluate()

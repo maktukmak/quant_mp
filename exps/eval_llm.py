@@ -9,7 +9,12 @@ import torch
 import transformers
 from lm_eval import evaluator
 from lm_eval.models.huggingface import HFLM
-from run_exp_llm import QuantizationArguments, print_once
+from run_exp_llm import (
+    ModelArguments,
+    QuantizationArguments,
+    load_quant_model,
+    print_once,
+)
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from safetensors.torch import load_file
 
@@ -19,7 +24,12 @@ from quant_mp.utils import patch_model
 
 @dataclass
 class EvalArguments:
-    model_path: Path
+    model_path: Path = field(  # type: ignore
+        default=None,
+        metadata={
+            "help": "Path to model directory. If not set, it will default to infer from quantization arguments"
+        },
+    )
     tasks: List[str] = field(
         default_factory=list,
         metadata={
@@ -45,37 +55,42 @@ class EvalArguments:
             self.tasks = self.tasks[0].split(",")
 
 
-def parse_args() -> Tuple[QuantizationArguments, EvalArguments]:
+def parse_args() -> Tuple[QuantizationArguments, EvalArguments, ModelArguments]:
     parser = transformers.HfArgumentParser(
-        (QuantizationArguments, EvalArguments),  # type: ignore
+        (QuantizationArguments, EvalArguments, ModelArguments),  # type: ignore
     )
 
-    quant_args, eval_args = parser.parse_args_into_dataclasses()
+    quant_args, eval_args, model_args = parser.parse_args_into_dataclasses()
 
-    return quant_args, eval_args
+    if eval_args.model_path is None:
+        eval_args.model_path = Path(
+            f"./output/{model_args.model_name.split('/')[-1]}/{quant_args.label}/best-model"
+        )
+    assert eval_args.model_path.exists(), (
+        f"Unable to find model at {eval_args.model_path}"
+    )
+
+    return quant_args, eval_args, model_args
 
 
 class QuantizedLLM(HFLM):
     def __init__(
         self,
         model_path: Path,
+        model_name: str,
         device: str,
         rconfig: Optional[rconfig] = None,
     ):
-        model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True)
-        if rconfig is not None:
-            patch_model(model, rconfig)
-            # Manually load params for quantized model
-            state_dict = {}
-            for state_dict_path in model_path.glob("*.safetensors"):
-                state_dict.update(load_file(state_dict_path))
-            missing, unexpected = model.load_state_dict(state_dict, strict=False)
-            if missing:
-                print_once(f"Missing parameters: {missing}")
-            if unexpected:
-                print_once(f"Unexpected parameters: {unexpected}")
+        # TODO: Maybe pull config and use transformers.dynamic_module_utils.get_class_from_dynamic_module
+        # More proper model patching without loading all pretrained weights first
+        if rconfig is None:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_path, trust_remote_code=True
+            )
+        else:
+            model = load_quant_model(model_path, rconfig)
 
-        tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
+        tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
         model.to(device)
 
         super().__init__(
@@ -83,7 +98,7 @@ class QuantizedLLM(HFLM):
             tokenizer=tokenizer,
             backend="causal",
             device="cuda",
-            batch_size=128,
+            batch_size="auto:2",
             trust_remote_code=True,
             use_fast_tokenizer=False,
             dtype=torch.bfloat16,
@@ -111,21 +126,32 @@ def convert_to_json_serializable(obj):
 
 
 def main():
-    quant_args, eval_args = parse_args()
+    quant_args, eval_args, model_args = parse_args()
 
     # Create the output directory if it doesn't exist
     output_dir = Path(eval_args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    output_file = (
+        output_dir
+        / f"{model_args.model_name.split('/')[-1]}_{quant_args.label}_results.json"
+    )
+
+    if output_file.exists():
+        print_once(
+            f"Results already calculated and stored in {output_file}. Skipping this eval run."
+        )
+        return
 
     # Initialize the model
     model = QuantizedLLM(
         model_path=eval_args.model_path,
+        model_name=model_args.model_name,
         device=eval_args.device,
         rconfig=quant_args.get_rconfig() if quant_args.is_quant else None,
     )
 
     # Run evaluation
-    print(f"Evaluating model on tasks: {eval_args.tasks}")
+    print_once(f"Evaluating model on tasks: {eval_args.tasks}")
     results = evaluator.simple_evaluate(
         model=model,
         tasks=eval_args.tasks,  # type: ignore
@@ -137,17 +163,15 @@ def main():
         return
 
     # Save results
-    model_name = os.path.basename(eval_args.model_path)
-    output_file = output_dir / f"{model_name}_{quant_args.label}_results.json"
     with open(output_file, "w") as f:
         json.dump(convert_to_json_serializable(results), f)
-    print(f"Results saved to {output_file}")
+    print_once(f"Results saved to {output_file}")
 
-    print("Summary:")
+    print_once("Summary:")
     for task_name, task_results in results["results"].items():
-        print(f"{task_name}:")
+        print_once(f"{task_name}:")
         for metric_name, metric_value in task_results.items():
-            print(f"  {metric_name}: {metric_value}")
+            print_once(f"  {metric_name}: {metric_value}")
 
 
 if __name__ == "__main__":
