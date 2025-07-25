@@ -1,4 +1,5 @@
 import torch
+
 from .template import DataFormat, register_data_format
 
 

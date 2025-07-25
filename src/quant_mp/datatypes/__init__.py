@@ -8,7 +8,6 @@ from .float import (
     Fp32,
 )
 from .int import Int2, Int3, Int4, Int8, UniformDataFormat
-
 from .nonuniform import NF4, SF4
 
 int2 = Int2()
