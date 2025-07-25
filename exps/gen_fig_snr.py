@@ -2,12 +2,18 @@ import matplotlib.pyplot as plt
 import torch
 
 from quant_mp.algs.analytic import snr_float, snr_uniform, snr_general
-from quant_mp.datatypes import Fp4_e2m1, Fp4_e3m0, Int2, Int3, Int4, NF4
+from quant_mp.datatypes import Fp4_e2m1, Fp4_e3m0, Int2, Int3, Int4, NF4, SF4
 
 C = torch.linspace(1, 10, 100)
 
 label = "4-bit normal-float"
 data_format = NF4()
+res = snr_general(data_format, C, 1.0)
+print(label + " max snr: ", torch.max(res))
+plt.plot(C, res, label=label)
+
+label = "4-bit student-float"
+data_format = SF4()
 res = snr_general(data_format, C, 1.0)
 print(label + " max snr: ", torch.max(res))
 plt.plot(C, res, label=label)

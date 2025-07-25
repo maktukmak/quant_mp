@@ -104,7 +104,7 @@ def snr_uniform(C, sigma2, N):
 def snr_general(dataformat, C, sigma2):
 
     grid = C.unsqueeze(1) * dataformat.get_representable_values() / dataformat.max_value
-    data = torch.randn((1000,))
+    data = torch.randn((10000,))
 
     err = []
     for g in grid:

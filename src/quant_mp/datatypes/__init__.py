@@ -9,7 +9,7 @@ from .float import (
 )
 from .int import Int2, Int3, Int4, Int8, UniformDataFormat
 
-from .nf4 import NF4
+from .nonuniform import NF4, SF4
 
 int2 = Int2()
 int3 = Int3()
@@ -24,6 +24,7 @@ fp8_e4m3fnuz = Fp8_e4m3fnuz()
 fp32 = Fp32()
 
 nf4 = NF4()
+sf4 = SF4()
 
 __all__ = [
     "UniformDataFormat",
@@ -38,5 +39,6 @@ __all__ = [
     "fp8_e4m3",
     "fp8_e4m3fnuz",
     "fp32",
-    "nf4"
+    "nf4",
+    "sf4-v5"
 ]
