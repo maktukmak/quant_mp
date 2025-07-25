@@ -9,6 +9,8 @@ from .float import (
 )
 from .int import Int2, Int3, Int4, Int8, UniformDataFormat
 
+from .nf4 import NF4
+
 int2 = Int2()
 int3 = Int3()
 int4 = Int4()
@@ -20,6 +22,8 @@ fp8_e5m2 = Fp8_e5m2()
 fp8_e4m3 = Fp8_e4m3()
 fp8_e4m3fnuz = Fp8_e4m3fnuz()
 fp32 = Fp32()
+
+nf4 = NF4()
 
 __all__ = [
     "UniformDataFormat",
@@ -34,4 +38,5 @@ __all__ = [
     "fp8_e4m3",
     "fp8_e4m3fnuz",
     "fp32",
+    "nf4"
 ]

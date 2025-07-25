@@ -101,6 +101,18 @@ def snr_uniform(C, sigma2, N):
         + z / (3 * ((N - 1) ** 2))
     )
 
+def snr_general(dataformat, C, sigma2):
+
+    grid = C.unsqueeze(1) * dataformat.get_representable_values() / dataformat.max_value
+    data = torch.randn((1000,))
+
+    err = []
+    for g in grid:
+        qdata  = g[torch.argmin(torch.abs(data.unsqueeze(1) - g), dim=-1)]
+        err.append(torch.mean((data - qdata)**2))
+
+    return sigma2  / torch.tensor(err)
+
 
 @cache
 def get_copt_uniform(data_format: "UniformDataFormat") -> float:
