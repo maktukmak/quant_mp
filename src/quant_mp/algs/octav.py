@@ -30,10 +30,10 @@ class Octav(Algorithm):
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
         for _ in range(self.num_iters):
             # TODO: Determine which one is correct
-            _, inside_mask = quant(data_format, input, scale, shift)
-            outside_mask = ~inside_mask
-            # outside_mask = torch.abs(input) > scale
-            # inside_mask = ~outside_mask
+            # _, inside_mask = quant(data_format, input, scale, shift)
+            # outside_mask = ~inside_mask
+            outside_mask = torch.abs(input) > scale
+            inside_mask = ~outside_mask
             if shift is None:
                 scale = torch.sum(
                     torch.abs(input) * outside_mask, dim=1, keepdim=True
