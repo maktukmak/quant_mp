@@ -2,6 +2,8 @@ from typing import TYPE_CHECKING, Optional
 
 import torch
 
+from quant_mp.quantizer import quant
+
 from .template import Algorithm, register_algorithm
 
 if TYPE_CHECKING:
@@ -15,7 +17,7 @@ class Octav(Algorithm):
     has_custom_gradients = True
     num_iters: int
 
-    def __init__(self, num_iters: int = 1) -> None:
+    def __init__(self, num_iters: int = 10) -> None:
         self.num_iters = num_iters
         super().__init__()
 
@@ -27,8 +29,11 @@ class Octav(Algorithm):
         shift: Optional[torch.Tensor] = None,
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
         for _ in range(self.num_iters):
-            outside_mask = torch.abs(input) > scale
-            inside_mask = ~outside_mask
+            # TODO: Determine which one is correct
+            _, inside_mask = quant(data_format, input, scale, shift)
+            outside_mask = ~inside_mask
+            # outside_mask = torch.abs(input) > scale
+            # inside_mask = ~outside_mask
             if shift is None:
                 scale = torch.sum(
                     torch.abs(input) * outside_mask, dim=1, keepdim=True
@@ -52,4 +57,10 @@ class Octav(Algorithm):
         quant_mask: torch.Tensor,
         grad_output: torch.Tensor,
     ) -> tuple[torch.Tensor | None, torch.Tensor | None, torch.Tensor | None]:
-        return self.ste(ctx, quant_mask, grad_output)
+        # TODO: Determine which one is correct
+        # return self.ste(ctx, quant_mask, grad_output)
+        grad_input, _, _ = self.ste(ctx, quant_mask, grad_output)
+        if grad_input is not None:
+            outside_mask = ~quant_mask
+            grad_input += scale / torch.abs(input + 1e-8) * outside_mask.float() * grad_output
+        return grad_input, None, None
