@@ -1,8 +1,8 @@
 from .analytic import Analytic
 from .iterative import Iterative
 from .lsq import LSQ
-from .octav import Octav
 from .minmax import MinMax
+from .octav import Octav
 from .template import ALGORITHMS, get_algorithm
 
 __all__ = [
