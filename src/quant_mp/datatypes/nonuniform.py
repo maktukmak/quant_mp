@@ -12,11 +12,11 @@ class NonUniformDataFormat(DataFormat):
 
     @property
     def max_value(self) -> float:
-        return torch.max(self.get_representable_values())
+        return torch.max(self.get_representable_values()).item()
 
     @property
     def min_value(self) -> float:
-        return torch.min(self.get_representable_values())
+        return torch.min(self.get_representable_values()).item()
 
     @property
     def n_values(self) -> int:
@@ -26,8 +26,8 @@ class NonUniformDataFormat(DataFormat):
         orig_shape = data.shape
         data = data.flatten().unsqueeze(1)
         data = self.get_representable_values()[
-            torch.argmin(torch.abs(data - self.get_representable_values()), dim=-1)
-        ]
+            torch.argmin(torch.abs(data - self.get_representable_values().to(data.device)), dim=-1).to("cpu")
+        ].to(data.device)
 
         return data.reshape(orig_shape)
 
