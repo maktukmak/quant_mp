@@ -2,8 +2,6 @@ from typing import TYPE_CHECKING, Optional
 
 import torch
 
-from quant_mp.quantizer import quant
-
 from .template import Algorithm, register_algorithm
 
 if TYPE_CHECKING:
