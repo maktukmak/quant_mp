@@ -27,9 +27,6 @@ class Octav(Algorithm):
         shift: Optional[torch.Tensor] = None,
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
         for _ in range(self.num_iters):
-            # TODO: Determine which one is correct
-            # _, inside_mask = quant(data_format, input, scale, shift)
-            # outside_mask = ~inside_mask
             outside_mask = torch.abs(input) > scale
             inside_mask = ~outside_mask
             if shift is None:
@@ -55,8 +52,6 @@ class Octav(Algorithm):
         quant_mask: torch.Tensor,
         grad_output: torch.Tensor,
     ) -> tuple[torch.Tensor | None, torch.Tensor | None, torch.Tensor | None]:
-        # TODO: Determine which one is correct
-        # return self.ste(ctx, quant_mask, grad_output)
         grad_input, _, _ = self.ste(ctx, quant_mask, grad_output)
         if grad_input is not None:
             outside_mask = ~quant_mask
