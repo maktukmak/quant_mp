@@ -26,7 +26,10 @@ class NonUniformDataFormat(DataFormat):
         orig_shape = data.shape
         data = data.flatten().unsqueeze(1)
         data = self.get_representable_values()[
-            torch.argmin(torch.abs(data - self.get_representable_values().to(data.device)), dim=-1).to("cpu")
+            torch.argmin(
+                torch.abs(data - self.get_representable_values().to(data.device)),
+                dim=-1,
+            ).to("cpu")
         ].to(data.device)
 
         return data.reshape(orig_shape)
