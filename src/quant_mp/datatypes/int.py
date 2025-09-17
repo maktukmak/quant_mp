@@ -24,13 +24,13 @@ class UniformDataFormat(DataFormat):
     @property
     def min_value(self) -> float:
         if self.signed:
-            return -(2 ** (self.bit_width - 1)) + 1
+            return -(2 ** (self.bit_width - 1))
         else:
             return 0.0
 
     @property
     def n_values(self) -> int:
-        return int(2**self.bit_width - 1)
+        return int(2**self.bit_width)
 
     def cast(self, data: torch.Tensor) -> torch.Tensor:
         return torch.clamp(torch.round(data), min=self.min_value, max=self.max_value)
