@@ -230,9 +230,7 @@ def build_rows(
             if acc_json is None:
                 task_values[TASK_SHORT[task]] = None
             else:
-                task_values[TASK_SHORT[task]] = extract_task_acc_percent(
-                    acc_json, task
-                )
+                task_values[TASK_SHORT[task]] = extract_task_acc_percent(acc_json, task)
 
         avg_val = compute_avg(list(task_values.values()))
         wiki_val = load_wiki_eval_perplexity(output_dir, model_short, label)
