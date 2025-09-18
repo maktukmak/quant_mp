@@ -93,6 +93,38 @@ SORT_HELP_GROUPED = (
     "avg (aliases: average, mean), wiki2 (aliases: perplexity, ppl)"
 )
 
+# Default non-metric columns to display (replaces showing only 'label').
+META_COLUMNS_DEFAULT: List[str] = [
+    "model",
+    "w_dtype",
+    "w_alg",
+    "w_block",
+    "a_dtype",
+    "a_alg",
+    "a_block",
+]
+
+# Hide group aliases for convenience
+HIDE_GROUPS: Dict[str, List[str]] = {
+    "activations": ["a_dtype", "a_alg", "a_block"],
+    "activation": ["a_dtype", "a_alg", "a_block"],
+    "acts": ["a_dtype", "a_alg", "a_block"],
+}
+
+
+def expand_hide_tokens(tokens: List[str]) -> List[str]:
+    out: List[str] = []
+    seen = set()
+    for t in tokens:
+        if not t:
+            continue
+        exp = HIDE_GROUPS.get(t, [t])
+        for item in exp:
+            if item not in seen:
+                out.append(item)
+                seen.add(item)
+    return out
+
 
 def find_model_label_dirs(output_dir: Path) -> Iterable[Tuple[str, str, Path]]:
     """Yield (model_short, label, label_dir) found under output_dir.
@@ -183,10 +215,10 @@ def build_rows(
     Build table headers and rows.
 
     include_columns controls which metric columns are included (among task shorts, 'avg', 'wiki2').
-    'model' and 'label' columns are always prepended unless explicitly removed.
+    Non-metric columns default to individual traits: model, w_dtype, w_alg, w_block, a_dtype, a_alg, a_block.
     """
     # Headers
-    headers = ["model", "label"] + include_columns
+    headers = META_COLUMNS_DEFAULT + include_columns
     rows: List[List[str]] = []
 
     for model_short, label, _label_dir in find_model_label_dirs(output_dir):
@@ -198,7 +230,9 @@ def build_rows(
             if acc_json is None:
                 task_values[TASK_SHORT[task]] = None
             else:
-                task_values[TASK_SHORT[task]] = extract_task_acc_percent(acc_json, task)
+                task_values[TASK_SHORT[task]] = extract_task_acc_percent(
+                    acc_json, task
+                )
 
         avg_val = compute_avg(list(task_values.values()))
         wiki_val = load_wiki_eval_perplexity(output_dir, model_short, label)
@@ -209,7 +243,21 @@ def build_rows(
             "wiki2": wiki_val,
         }
 
-        row: List[str] = [model_short, label]
+        # Parse individual label fields
+        fields = parse_label_fields(label)
+
+        # Compose non-metric (meta) cells
+        meta_cells: List[str] = [
+            model_short,
+            fields.get("w_dtype") or "-",
+            fields.get("w_alg") or "-",
+            fields.get("w_block") or "-",
+            fields.get("a_dtype") or "-",
+            fields.get("a_alg") or "-",
+            fields.get("a_block") or "-",
+        ]
+
+        row: List[str] = meta_cells
         for col in include_columns:
             row.append(format_value(metric_map.get(col)))
         rows.append(row)
@@ -429,7 +477,9 @@ def parse_args() -> argparse.Namespace:
         default=[],
         help=(
             "Comma-separated list of columns to hide. "
-            "Columns: model,label,arc_e,arc_c,boolq,piqa,siqa,hella,obqa,wino,avg,wiki2."
+            "Columns: model,w_dtype,w_alg,w_block,a_dtype,a_alg,a_block,"
+            "arc_e,arc_c,boolq,piqa,siqa,hella,obqa,wino,avg,wiki2. "
+            "Groups: activations (hides a_dtype,a_alg,a_block)."
         ),
     )
     parser.add_argument(
@@ -474,12 +524,13 @@ def resolve_columns(hide_args: List[str], only: Optional[str]) -> List[str]:
             )
         return [only]
 
-    # Expand hide lists
-    hide: List[str] = []
+    # Expand hide lists (support group aliases)
+    hide_raw: List[str] = []
     for h in hide_args:
         if not h:
             continue
-        hide.extend([p.strip() for p in h.split(",") if p.strip()])
+        hide_raw.extend([p.strip() for p in h.split(",") if p.strip()])
+    hide = expand_hide_tokens(hide_raw)
 
     # Support hiding model/label as well
     # Build full column order, then filter
@@ -505,10 +556,19 @@ def main() -> None:
         row_data = sorted(row_data, key=keyfunc)
 
     # Compose table
-    headers = ["model", "label"] + include_columns
+    headers = META_COLUMNS_DEFAULT + include_columns
     rows: List[List[str]] = []
     for rd in row_data:
-        row_out: List[str] = [rd.get("model", ""), rd.get("label", "")]
+        # Non-metric columns: show individual traits instead of raw label
+        row_out: List[str] = [
+            rd.get("model", ""),
+            rd.get("w_dtype") or "-",
+            rd.get("w_alg") or "-",
+            rd.get("w_block") or "-",
+            rd.get("a_dtype") or "-",
+            rd.get("a_alg") or "-",
+            rd.get("a_block") or "-",
+        ]
         for col in include_columns:
             if col in {"avg", "wiki2"}:
                 row_out.append(format_value(rd.get(col)))
@@ -516,22 +576,23 @@ def main() -> None:
                 row_out.append(format_value((rd.get("metrics") or {}).get(col)))
         rows.append(row_out)
 
-    # If user hid model or label explicitly, drop from headers/rows
-    hide_expanded: List[str] = []
+    # Drop any columns the user asked to hide (meta or metrics)
+    hide_expanded_raw: List[str] = []
     for h in args.hide:
         if h:
-            hide_expanded.extend([p.strip() for p in h.split(",") if p.strip()])
-    to_drop_indices: List[int] = []
-    for col in ("model", "label"):
-        if col in hide_expanded:
-            idx = headers.index(col)
-            to_drop_indices.append(idx)
-    if to_drop_indices:
-        to_drop_indices = sorted(to_drop_indices, reverse=True)
-        for idx in to_drop_indices:
-            headers.pop(idx)
-            for r in rows:
-                r.pop(idx)
+            hide_expanded_raw.extend([p.strip() for p in h.split(",") if p.strip()])
+    hide_expanded = expand_hide_tokens(hide_expanded_raw)
+    if hide_expanded:
+        # Determine indices to drop from headers present in the table
+        to_drop_indices: List[int] = [
+            i for i, name in enumerate(headers) if name in set(hide_expanded)
+        ]
+        if to_drop_indices:
+            to_drop_indices = sorted(to_drop_indices, reverse=True)
+            for idx in to_drop_indices:
+                headers.pop(idx)
+                for r in rows:
+                    r.pop(idx)
 
     print_table(headers, rows)
 
