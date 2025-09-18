@@ -4,7 +4,7 @@ from typing import Generator
 import torch
 from loguru import logger
 
-from .template import DataFormat, register_data_format, nearest_neighbor_cast
+from .template import DataFormat, nearest_neighbor_cast, register_data_format
 
 
 class FloatDataFormat(DataFormat):
