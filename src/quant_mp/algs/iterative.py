@@ -31,14 +31,14 @@ class Iterative(Algorithm):
         for _ in range(self.num_iters):
             x_quant, _ = quant(data_format, input, scale, shift)
             if shift is None:
-                scale = torch.sum((input) * x_quant, axis=1, keepdim=True) / torch.sum(
-                    x_quant**2, axis=1, keepdim=True
+                scale = torch.sum((input) * x_quant, dim=1, keepdim=True) / torch.sum(
+                    x_quant**2, dim=1, keepdim=True
                 )
             else:
                 scale = torch.sum(
-                    (input - shift) * x_quant, axis=1, keepdim=True
-                ) / torch.sum(x_quant**2, axis=1, keepdim=True)
-                num_z = torch.sum(input - scale * x_quant, axis=1, keepdim=True)
+                    (input - shift) * x_quant, dim=1, keepdim=True
+                ) / torch.sum(x_quant**2, dim=1, keepdim=True)
+                num_z = torch.sum(input - scale * x_quant, dim=1, keepdim=True)
                 denum_z = len(input)
                 shift = num_z / denum_z
         return scale, shift

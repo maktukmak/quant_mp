@@ -24,7 +24,6 @@ class Analytic(Algorithm):
         scale: torch.Tensor,
         shift: Optional[torch.Tensor] = None,  # pyright: ignore[reportDeprecated]
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
-        # NOTE: Old implementation. Maybe can consolidate into one impl?
         from quant_mp.datatypes import FloatDataFormat, UniformDataFormat
 
         if not isinstance(data_format, (UniformDataFormat, FloatDataFormat)):
@@ -32,7 +31,7 @@ class Analytic(Algorithm):
 
         # TODO: Generalize axis if needed
         param_shape = scale.shape
-        x_std = torch.std(input, axis=1)
+        x_std = torch.std(input, dim=1)
         if isinstance(data_format, UniformDataFormat):
             scale = (2 * get_copt_uniform(data_format) * x_std) / (
                 data_format.n_values - 1
@@ -40,7 +39,7 @@ class Analytic(Algorithm):
         else:  # Float Data Format
             scale = get_copt_float(data_format) * x_std / data_format.max_value
         if shift is not None:
-            shift = torch.mean(input, axis=1).reshape(param_shape)
+            shift = torch.mean(input, dim=1).reshape(param_shape)
         return scale.reshape(param_shape), shift
 
     def compute_gradients(
@@ -77,7 +76,6 @@ def snr_float(G, xr, vr, C, sigma2):
     Cmax = G[-1]
     s = C / Cmax
     sigma2 = torch.tensor(sigma2)
-    C = torch.tensor(C)
 
     res = 2 * (1 + C**2 / sigma2) * q_function(C / torch.sqrt(sigma2))
     res += (
@@ -90,7 +88,7 @@ def snr_float(G, xr, vr, C, sigma2):
     F = gauss_cdf(s[:, None] * xr[None], 0.0, torch.sqrt(sigma2))
     p = F[:, 1:] - F[:, :-1]
 
-    res += torch.sum(((s[:, None] * vr[None]) ** 2) * p / (12 * sigma2), axis=1)
+    res += torch.sum(((s[:, None] * vr[None]) ** 2) * p / (12 * sigma2), dim=1)
     return 1 / res
 
 

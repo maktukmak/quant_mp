@@ -32,27 +32,6 @@ class MinMax(Algorithm):
         new_shift = min_x - data_format.min_value * new_scale
         return new_scale.reshape(scale.shape), new_shift.reshape(shift.shape)
 
-        # NOTE: Old implementation
-        from quant_mp.datatypes import FloatDataFormat, UniformDataFormat
-
-        if not isinstance(data_format, (UniformDataFormat, FloatDataFormat)):
-            raise RuntimeError(f"Invalid data format: {data_format}")
-
-        max_x = torch.max(torch.abs(input), axis=1)[0]
-        if isinstance(data_format, UniformDataFormat):
-            if shift is None:
-                return 2 * max_x / (data_format.n_values - 1), None
-            # Non-symmetric
-            min_x = torch.min(input, axis=1)[0]
-            return (max_x - min_x) / (data_format.n_values - 1), min_x + scale / 2
-        # Float
-        if shift is None:
-            return max_x / data_format.max_value
-        min_x = torch.min(input, axis=1)[0]
-        return (max_x - min_x) / (
-            2 * data_format.max_value
-        ), min_x + data_format.max_value * scale
-
     def compute_gradients(
         self,
         ctx,

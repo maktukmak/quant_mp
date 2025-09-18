@@ -4,7 +4,7 @@ from typing import Generator
 import torch
 from loguru import logger
 
-from .template import DataFormat, register_data_format
+from .template import DataFormat, register_data_format, nearest_neighbor_cast
 
 
 class FloatDataFormat(DataFormat):
@@ -87,13 +87,11 @@ class FloatDataFormat(DataFormat):
         return 2 ** (self.exponent - 1) - 1
 
     def cast_nearest_neighbor(self, data: torch.Tensor) -> torch.Tensor:
-        orig_shape = data.shape
+        device = data.device
+        dtype = data.dtype
         data = torch.clamp(data, self.min_value, self.max_value)
-        data_flat = data.view(-1)
-        representable_values_tensor = torch.tensor(self.get_representable_values())
-        diffs = (data_flat[:, None] - representable_values_tensor[None, :]).abs()
-        indices = torch.argmin(diffs, dim=1)
-        return representable_values_tensor[indices].view(orig_shape)
+        rv = self.get_values_cached(device, dtype)
+        return nearest_neighbor_cast(data, rv)
 
     def cast(self, data: torch.Tensor) -> torch.Tensor:
         data = torch.clamp(data, self.min_value, self.max_value)

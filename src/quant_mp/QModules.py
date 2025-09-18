@@ -255,9 +255,9 @@ class QLinear(nn.Linear):
 
             input = input.view(input_orig_shape)
 
-        out = nn.functional.linear(input, weight)
-        if self.bias is not None:
-            out += self.bias.unsqueeze(0).expand_as(out).to(input.device)
+        out = nn.functional.linear(
+            input, weight, None if self.bias is None else self.bias.to(input.device)
+        )
         return out
 
 

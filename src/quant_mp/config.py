@@ -17,7 +17,7 @@ class QuantConfig:
 
     def __post_init__(self):
         if isinstance(self.qblock_size, str) and self.qblock_size != "channel":
-            logger.error(
+            raise ValueError(
                 f'Invalid block size configuration: {self.qblock_size}. Must be None, int, or "channel"'
             )
 

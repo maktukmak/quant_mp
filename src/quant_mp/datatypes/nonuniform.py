@@ -1,6 +1,6 @@
 import torch
 
-from .template import DataFormat, register_data_format
+from .template import DataFormat, register_data_format, nearest_neighbor_cast
 
 
 class NonUniformDataFormat(DataFormat):
@@ -23,16 +23,10 @@ class NonUniformDataFormat(DataFormat):
         return int(len(self.get_representable_values()))
 
     def cast(self, data: torch.Tensor) -> torch.Tensor:
-        orig_shape = data.shape
-        data = data.flatten().unsqueeze(1)
-        data = self.get_representable_values()[
-            torch.argmin(
-                torch.abs(data - self.get_representable_values().to(data.device)),
-                dim=-1,
-            ).to("cpu")
-        ].to(data.device)
-
-        return data.reshape(orig_shape)
+        device = data.device
+        dtype = data.dtype
+        rv = self.get_values_cached(device, dtype)
+        return nearest_neighbor_cast(data, rv)
 
 
 @register_data_format
@@ -64,7 +58,7 @@ class NF4(NonUniformDataFormat):
 
 @register_data_format
 class SF4(NonUniformDataFormat):
-    name = "sf4-v5"
+    name = "sf4"
 
     def get_representable_values(self) -> torch.Tensor:
         return torch.tensor(

@@ -17,6 +17,9 @@ class DataFormat(ABC):
         The name and bit_width attributes must be set in subclasses.
         """
         super().__init__(*args, **kwargs)
+        # Cache of representable values moved to specific device/dtype
+        # Keyed by (str(device), dtype)
+        self._rv_cache: dict[tuple[str, torch.dtype], torch.Tensor] = {}
         self._validate()
 
     def _validate(self) -> None:
@@ -90,6 +93,19 @@ class DataFormat(ABC):
         Returns all representable values for this data format. Implementation should return sorted values and is cached for performance.
         """
 
+    def get_values_cached(
+        self, device: torch.device, dtype: torch.dtype
+    ) -> torch.Tensor:
+        """
+        Returns representable values materialized on the requested device/dtype, with per-device/dtype caching.
+        """
+        key = (str(device), dtype)
+        rv = self._rv_cache.get(key)
+        if rv is None:
+            rv = self.get_representable_values().to(device=device, dtype=dtype)
+            self._rv_cache[key] = rv
+        return rv
+
 
 DATA_FORMATS: dict[str, DataFormat] = {}
 _T = TypeVar("_T", bound=type)
@@ -119,3 +135,17 @@ def get_data_format(name: str) -> DataFormat:
             f"Unrecognized data format name: {name}. Valid data formats: {DATA_FORMATS.keys()}"
         )
     return DATA_FORMATS[name]
+
+
+def nearest_neighbor_cast(
+    data: torch.Tensor, representable_values: torch.Tensor
+) -> torch.Tensor:
+    """
+    Cast `data` to the nearest values from `representable_values` using L1 distance.
+    Assumes `representable_values` is already on the same device/dtype as `data`.
+    """
+    orig_shape = data.shape
+    data_flat = data.reshape(-1)
+    diffs = (data_flat[:, None] - representable_values[None, :]).abs()
+    idx = torch.argmin(diffs, dim=1)
+    return representable_values[idx].reshape(orig_shape)
