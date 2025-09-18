@@ -3,7 +3,6 @@ import json
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
-
 # Tasks and human-friendly short names for table headers
 TASKS: List[str] = [
     "arc_easy",
