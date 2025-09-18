@@ -16,14 +16,12 @@ class TestUniformDataFormat:
         # Test basic properties
         if format_name == "int4":
             assert data_format.max_value == 7.0
-            # FIXME: Discuss this requirement later
-            # assert data_format.min_value == -8.0
-            # assert data_format.n_values == 16
+            assert data_format.min_value == -8.0
+            assert data_format.n_values == 16
         elif format_name == "int8":
             assert data_format.max_value == 127.0
-            # FIXME: Discuss this requirement later
-            # assert data_format.min_value == -128.0
-            # assert data_format.n_values == 256
+            assert data_format.min_value == -128.0
+            assert data_format.n_values == 256
 
         # Test representable values
         values = data_format.get_representable_values()

@@ -1,3 +1,4 @@
+import math
 from functools import cache
 from typing import TYPE_CHECKING, Optional
 
@@ -63,6 +64,13 @@ def error(x, xdeq):
 
 
 def q_function(x):
+    """Gaussian Q-function.
+
+    Uses torch.erf for torch tensors to avoid dtype coercion warnings,
+    and falls back to scipy.special.erf for numpy/scalar inputs.
+    """
+    if isinstance(x, torch.Tensor):
+        return 0.5 - 0.5 * torch.erf(x / math.sqrt(2.0))
     return 0.5 - 0.5 * special.erf(x / np.sqrt(2))
 
 

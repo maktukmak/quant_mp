@@ -4,9 +4,9 @@ from typing import Callable, Tuple
 import pytest
 import torch
 
-from quant_mp.datatypes.template import get_data_format as _qmp_get_df
-from quant_mp.config import QuantConfig
 from quant_mp.algs.template import get_algorithm
+from quant_mp.config import QuantConfig
+from quant_mp.datatypes.template import get_data_format as _qmp_get_df
 from quant_mp.QModules import QuantFunction
 
 
@@ -19,7 +19,7 @@ class ReferenceLSQ(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        ctx, input: torch.Tensor, alpha: torch.Tensor, num_bits: int, layerwise: bool
+        ctx, input: torch.Tensor, scale: torch.Tensor, num_bits: int, layerwise: bool
     ):
         ctx.num_bits = int(num_bits)
         ctx.layerwise = bool(layerwise)
@@ -33,41 +33,41 @@ class ReferenceLSQ(torch.autograd.Function):
             Qp = 2 ** (num_bits - 1) - 1
 
         # Ensure positive step
-        eps = torch.tensor(1e-5, device=alpha.device, dtype=alpha.dtype)
-        alpha_eff = torch.where(alpha > eps, alpha, eps)
+        eps = torch.tensor(1e-5, device=scale.device, dtype=scale.dtype)
+        scale_eff = torch.where(scale > eps, scale, eps)
 
         # Save for backward
         grad_scale = 1.0 / math.sqrt(
             float(input.numel()) * (float(Qp) if num_bits not in (0, 1) else 1.0)
         )
-        ctx.save_for_backward(input, alpha_eff)
+        ctx.save_for_backward(input, scale_eff)
         ctx.other = (Qn, Qp, grad_scale)
 
         if num_bits == 1:
             q_w = input.sign()
         else:
-            q_w = (input / alpha_eff).round().clamp(Qn, Qp)
-        return q_w * alpha_eff
+            q_w = (input / scale_eff).round().clamp(Qn, Qp)
+        return q_w * scale_eff
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
         if ctx.num_bits >= 16:
             return grad_output, None, None, None
 
-        input_, alpha = ctx.saved_tensors
+        input_, scale = ctx.saved_tensors
         Qn, Qp, grad_scale = ctx.other
-        q_w = input_ / alpha
+        q_w = input_ / scale
         indicate_small = (q_w < Qn).float()
         indicate_big = (q_w > Qp).float()
         indicate_middle = 1.0 - indicate_small - indicate_big
 
         if ctx.num_bits == 1:
             if ctx.layerwise:
-                grad_alpha = (
+                grad_scale_param = (
                     (input_.sign() * grad_output * grad_scale).sum().unsqueeze(0)
                 )
             else:
-                grad_alpha = (input_.sign() * grad_output * grad_scale).sum(
+                grad_scale_param = (input_.sign() * grad_output * grad_scale).sum(
                     dim=-1, keepdim=True
                 )
         else:
@@ -77,16 +77,18 @@ class ReferenceLSQ(torch.autograd.Function):
                 + indicate_middle * (-q_w + q_w.round())
             )
             if ctx.layerwise:
-                grad_alpha = (base * grad_output * grad_scale).sum().unsqueeze(0)
+                grad_scale_param = (base * grad_output * grad_scale).sum().unsqueeze(0)
             else:
-                grad_alpha = (base * grad_output * grad_scale).sum(dim=-1, keepdim=True)
+                grad_scale_param = (base * grad_output * grad_scale).sum(
+                    dim=-1, keepdim=True
+                )
 
         grad_input = indicate_middle * grad_output
-        return grad_input, grad_alpha, None, None
+        return grad_input, grad_scale_param, None, None
 
 
 def quantmp_lsq(
-    input: torch.Tensor, alpha: torch.Tensor, num_bits: int, layerwise: bool
+    input: torch.Tensor, scale: torch.Tensor, num_bits: int, layerwise: bool
 ):
     """Use the actual QuantMP LSQ via QuantFunction with an LSQ QuantConfig."""
     if num_bits >= 16:
@@ -100,7 +102,7 @@ def quantmp_lsq(
         symmetric=True,
         qblock_size="channel" if layerwise else None,
     )
-    return QuantFunction.apply(input, alpha, None, qcfg)
+    return QuantFunction.apply(input, scale, None, qcfg)
 
 
 def _prepare_inputs(
@@ -109,23 +111,23 @@ def _prepare_inputs(
     torch.manual_seed(0)
     x = torch.randn(B, N, device=device, dtype=torch.float32)
     if layerwise:
-        alpha = torch.tensor([0.2], device=device, dtype=torch.float32)
+        scale = torch.tensor([0.2], device=device, dtype=torch.float32)
     else:
-        alpha = torch.rand(B, 1, device=device, dtype=torch.float32) * 0.5 + 0.1
-    return x, alpha
+        scale = torch.rand(B, 1, device=device, dtype=torch.float32) * 0.5 + 0.1
+    return x, scale
 
 
-def _finite_diff_alpha(
-    F: Callable, x: torch.Tensor, alpha: torch.Tensor, num_bits: int, layerwise: bool
+def _finite_diff_scale(
+    F: Callable, x: torch.Tensor, scale: torch.Tensor, num_bits: int, layerwise: bool
 ) -> torch.Tensor:
     # Centered finite difference of sum(F(x, alpha)) w.r.t alpha, scaled by LSQ grad_scale.
     # Use a relative step size w.r.t. alpha magnitude to reduce FD noise,
     # especially for higher bit-widths and layerwise settings.
-    alpha_mag = float(alpha.detach().abs().mean().item())
-    eps = max(1e-4, 2e-2 * alpha_mag)
+    scale_mag = float(scale.detach().abs().mean().item())
+    eps = max(1e-4, 2e-2 * scale_mag)
 
     def make_alpha(delta: float):
-        a = alpha.clone().detach()
+        a = scale.clone().detach()
         a = a + delta
         return a
 
@@ -142,7 +144,7 @@ def _finite_diff_alpha(
         grad_scale = 1.0 / math.sqrt(float(x.numel()) * Qp)
 
     g_est_scaled = g_est_scalar * grad_scale
-    return torch.full_like(alpha, g_est_scaled / alpha.numel())
+    return torch.full_like(scale, g_est_scaled / scale.numel())
 
 
 @pytest.mark.parametrize(
@@ -164,53 +166,59 @@ def test_lsq_reference_vs_quantmp(num_bits: int, layerwise: bool):
     rtol, atol = 1e-4, 1e-5
 
     # Shared inputs
-    x_data, alpha_data = _prepare_inputs(B, N, device, layerwise)
+    x_data, scale_data = _prepare_inputs(B, N, device, layerwise)
 
-    def run_case(Ext):
-        x = x_data.clone().detach().requires_grad_(True)
-        alpha = alpha_data.clone().detach().requires_grad_(True)
-        # Support both autograd.Function subclasses and plain callables
-        if hasattr(Ext, "apply"):
-            y = Ext.apply(x, alpha, num_bits, layerwise)
-        else:
-            y = Ext(x, alpha, num_bits, layerwise)
-        loss = y.sum()
-        loss.backward()
-        return (
-            y.detach(),
-            x.grad.detach() if x.grad is not None else None,
-            alpha.grad.detach() if alpha.grad is not None else None,
-        )
+    # Reference forward/backward
+    x = x_data.clone().detach().requires_grad_(True)
+    scale = scale_data.clone().detach().requires_grad_(True)
+    y_ref = ReferenceLSQ.apply(x, scale, num_bits, layerwise)
+    y_ref.sum().backward()
+    grad_x_ref = x.grad.detach() if x.grad is not None else None
+    grad_scale_ref = None if scale.grad is None else scale.grad.detach()
 
-    yA, gxA, gaA = run_case(ReferenceLSQ)
-    yB, gxB, gaB = run_case(quantmp_lsq)
+    # QuantMP forward/backward via real LSQ
+    x = x_data.clone().detach().requires_grad_(True)
+    scale = scale_data.clone().detach().requires_grad_(True)
+    y_qmp = quantmp_lsq(x, scale, num_bits, layerwise)
+    y_qmp.sum().backward()
+    grad_x_qmp = x.grad.detach() if x.grad is not None else None
+    grad_scale_qmp = None if scale.grad is None else scale.grad.detach()
 
     # Forward/grad equality between implementations
-    assert yA.shape == yB.shape
-    assert torch.allclose(yA, yB, rtol=rtol, atol=atol)
+    assert y_ref.shape == y_qmp.shape
+    assert torch.allclose(y_ref, y_qmp, rtol=rtol, atol=atol)
 
-    assert gxA is not None and gxB is not None and gxA.shape == gxB.shape
-    assert torch.isfinite(gxA).all() and torch.isfinite(gxB).all()
-    assert torch.allclose(gxA, gxB, rtol=rtol, atol=atol)
+    assert (
+        grad_x_ref is not None
+        and grad_x_qmp is not None
+        and grad_x_ref.shape == grad_x_qmp.shape
+    )
+    assert torch.isfinite(grad_x_ref).all() and torch.isfinite(grad_x_qmp).all()
+    assert torch.allclose(grad_x_ref, grad_x_qmp, rtol=rtol, atol=atol)
 
     if num_bits >= 16:
         # Identity path expectations
-        assert torch.allclose(gxA, torch.ones_like(gxA), rtol=rtol, atol=atol)
-        assert gaA is None and gaB is None
+        assert torch.allclose(
+            grad_x_ref, torch.ones_like(grad_x_ref), rtol=rtol, atol=atol
+        )
+        assert grad_scale_ref is None and grad_scale_qmp is None
         return
 
     # Alpha grad presence/shape/finite
-    assert gaA is not None and gaB is not None
-    assert gaA.shape == alpha_data.shape and gaB.shape == alpha_data.shape
-    assert torch.isfinite(gaA).all() and torch.isfinite(gaB).all()
-    assert torch.allclose(gaA, gaB, rtol=rtol, atol=atol)
+    assert grad_scale_ref is not None and grad_scale_qmp is not None
+    assert (
+        grad_scale_ref.shape == scale_data.shape
+        and grad_scale_qmp.shape == scale_data.shape
+    )
+    assert torch.isfinite(grad_scale_ref).all() and torch.isfinite(grad_scale_qmp).all()
+    assert torch.allclose(grad_scale_ref, grad_scale_qmp, rtol=rtol, atol=atol)
 
     # Coarse finite-difference sanity (scaled like LSQ)
-    def F_ref(inp, a, nb, lw):
-        return ReferenceLSQ.apply(inp, a, nb, lw)
+    def F_ref(inp, sc, nb, lw):
+        return ReferenceLSQ.apply(inp, sc, nb, lw)
 
-    g_est = _finite_diff_alpha(F_ref, x_data, alpha_data, num_bits, layerwise)
-    lhs = float(gaA.abs().mean().item())
+    g_est = _finite_diff_scale(F_ref, x_data, scale_data, num_bits, layerwise)
+    lhs = float(grad_scale_ref.abs().mean().item())
     rhs = float(g_est.abs().mean().item())
     # Magnitude should be within a reasonable factor (very lenient due to non-smoothness).
     # Allow a slightly higher tolerance for higher bit-widths in layerwise mode, where
