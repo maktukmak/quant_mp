@@ -3,7 +3,7 @@ import torch.nn.functional as F
 
 from quant_mp.config import QuantModuleConfig
 from quant_mp.QModules import QConv2d, QLinear
-from quant_mp.utils import replace_module
+from quant_mp.utils import patch_model
 
 # TODO: All models not validated working under new paradigm yet
 
@@ -169,29 +169,29 @@ class ResNet(nn.Module):
 
 def ResNet18(rconfig: QuantModuleConfig):
     model = ResNet(BasicBlock, [2, 2, 2, 2])
-    replace_module(model, rconfig)
+    patch_model(model, rconfig)
     return model
 
 
 def ResNet34(rconfig: QuantModuleConfig):
     model = ResNet(BasicBlock, [3, 4, 6, 3])
-    replace_module(model, rconfig)
+    patch_model(model, rconfig)
     return model
 
 
 def ResNet50(rconfig: QuantModuleConfig):
     model = ResNet(Bottleneck, [3, 4, 6, 3])
-    replace_module(model, rconfig)
+    patch_model(model, rconfig)
     return model
 
 
 def ResNet101(rconfig: QuantModuleConfig):
     model = ResNet(Bottleneck, [3, 4, 23, 3])
-    replace_module(model, rconfig)
+    patch_model(model, rconfig)
     return model
 
 
 def ResNet152(rconfig: QuantModuleConfig):
     model = ResNet(Bottleneck, [3, 8, 36, 3])
-    replace_module(model, rconfig)
+    patch_model(model, rconfig)
     return model
